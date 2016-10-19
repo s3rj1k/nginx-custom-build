@@ -1,0 +1,5 @@
+# ignore changelog date
+nginx: latest-debian-changelog-entry-without-new-date
+
+# static openssl
+nginx: embedded-library usr/sbin/nginx: openssl

@@ -1,0 +1,11 @@
+# ignore changelog date
+nginx: latest-debian-changelog-entry-without-new-date
+
+# pagespeed
+nginx: embedded-library usr/lib/nginx/modules/ngx_pagespeed.so: libpng
+nginx: embedded-library usr/lib/nginx/modules/ngx_pagespeed.so: libjsoncpp
+nginx: embedded-library usr/lib/nginx/modules/ngx_pagespeed.so: zlib
+nginx: embedded-library usr/lib/nginx/modules/ngx_pagespeed.so: libjpeg
+
+# static openssl
+nginx: embedded-library usr/sbin/nginx: openssl

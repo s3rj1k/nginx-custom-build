@@ -1,0 +1,5 @@
+# ignore changelog date
+nginx-extra-modules: latest-debian-changelog-entry-without-new-date
+
+# perl
+nginx-extra-modules: arch-dependent-file-in-usr-share usr/share/perl5/auto/nginx/nginx.so

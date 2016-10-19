@@ -1,0 +1,13 @@
+--- ngx_cache_purge_original/ngx_cache_purge_module.c	2017-07-18 01:06:35.145320780 +0300
++++ ngx_cache_purge_patched/ngx_cache_purge_module.c	2017-03-22 12:59:54.000000000 +0200
+@@ -492,7 +492,11 @@
+     ngx_str_t                      body_source;
+ #  endif /* nginx_version < 1007008 */
+ 
++#  if (nginx_version >= 1011006)
++    ngx_http_complex_value_t      *method;
++#  else
+     ngx_str_t                      method;
++#  endif /* nginx_version >= 1011006 */
+     ngx_str_t                      location;
+     ngx_str_t                      url;

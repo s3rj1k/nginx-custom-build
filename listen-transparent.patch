@@ -1,0 +1,224 @@
+diff --git src/core/ngx_connection.c src/core/ngx_connection.c
+index 3368253..104489a 100644
+--- src/core/ngx_connection.c
++++ src/core/ngx_connection.c
+@@ -560,6 +560,49 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
+             }
+ #endif
+ 
++#if (NGX_HAVE_TRANSPARENT_PROXY && __linux)
++            /* Don't need to set on FreeBSD or OSX */
++
++            if (ls[i].transparent && !ngx_test_config) {
++
++                int transparent = 1;
++
++                switch (ls[i].sockaddr->sa_family) {
++
++                case AF_INET:
++
++                    if (setsockopt(s, IPPROTO_IP, IP_TRANSPARENT,
++                                   (const void *) &transparent, sizeof(int)) == -1)
++                    {
++                        ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
++                                      "setsockopt(IP_TRANSPARENT) %V failed",
++                                      &ls[i].addr_text);
++                        return NGX_ERROR;
++                    }
++
++                    break;
++
++#if (NGX_HAVE_INET6)
++
++                case AF_INET6:
++
++                    if (setsockopt(s, IPPROTO_IPV6, IPV6_TRANSPARENT,
++                                   (const void *) &transparent, sizeof(int)) == -1)
++                    {
++                        ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
++                                      "setsockopt(IPV6_TRANSPARENT) %V failed",
++                                      &ls[i].addr_text);
++                        return NGX_ERROR;
++                    }
++
++                    break;
++
++#endif /* NGX_HAVE_INET6 */
++
++                }
++            }
++#endif /* NGX_HAVE_TRANSPARENT_PROXY */
++
+ #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
+ 
+             if (ls[i].sockaddr->sa_family == AF_INET6) {
+diff --git src/core/ngx_connection.h src/core/ngx_connection.h
+index ad6556d..6e84e9c 100644
+--- src/core/ngx_connection.h
++++ src/core/ngx_connection.h
+@@ -74,6 +74,10 @@ struct ngx_listening_s {
+ #endif
+     unsigned            reuseport:1;
+     unsigned            add_reuseport:1;
++
++#if (NGX_HAVE_TRANSPARENT_PROXY)
++    unsigned            transparent:1;
++#endif
+     unsigned            keepalive:2;
+ 
+     unsigned            deferred_accept:1;
+diff --git src/event/ngx_event_accept.c src/event/ngx_event_accept.c
+index 4364240..989f615 100644
+--- src/event/ngx_event_accept.c
++++ src/event/ngx_event_accept.c
+@@ -215,6 +215,13 @@ ngx_event_accept(ngx_event_t *ev)
+         c->local_sockaddr = ls->sockaddr;
+         c->local_socklen = ls->socklen;
+ 
++#if (NGX_HAVE_TRANSPARENT_PROXY)
++        if (ls->transparent) {
++            c->local_sockaddr = NULL;
++            c->local_socklen = 0;
++        }
++#endif
++
+ #if (NGX_HAVE_UNIX_DOMAIN)
+         if (c->sockaddr->sa_family == AF_UNIX) {
+             c->tcp_nopush = NGX_TCP_NOPUSH_DISABLED;
+diff --git src/http/ngx_http.c src/http/ngx_http.c
+index 79ef9c6..25da4f9 100644
+--- src/http/ngx_http.c
++++ src/http/ngx_http.c
+@@ -1770,6 +1770,10 @@ ngx_http_add_listening(ngx_conf_t *cf, ngx_http_conf_addr_t *addr)
+     ls->reuseport = addr->opt.reuseport;
+ #endif
+ 
++#if (NGX_HAVE_TRANSPARENT_PROXY)
++    ls->transparent = addr->opt.transparent;
++#endif
++
+     return ls;
+ }
+ 
+diff --git src/http/ngx_http_core_module.c src/http/ngx_http_core_module.c
+index 3671558..14989ef 100644
+--- src/http/ngx_http_core_module.c
++++ src/http/ngx_http_core_module.c
+@@ -4054,6 +4054,18 @@ ngx_http_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+             continue;
+         }
+ 
++        if (ngx_strcmp(value[n].data, "transparent") == 0) {
++#if (NGX_HAVE_TRANSPARENT_PROXY)
++            lsopt.transparent = 1;
++            continue;
++#else
++            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                               "transparent is not supported "
++                               "on this platform");
++            return NGX_CONF_ERROR;
++#endif
++        }
++
+         if (ngx_strcmp(value[n].data, "ssl") == 0) {
+ #if (NGX_HTTP_SSL)
+             lsopt.ssl = 1;
+diff --git src/http/ngx_http_core_module.h src/http/ngx_http_core_module.h
+index 2aadae7..1adc945 100644
+--- src/http/ngx_http_core_module.h
++++ src/http/ngx_http_core_module.h
+@@ -80,6 +80,9 @@ typedef struct {
+ #endif
+     unsigned                   deferred_accept:1;
+     unsigned                   reuseport:1;
++#if (NGX_HAVE_TRANSPARENT_PROXY)
++    unsigned                   transparent:1;
++#endif
+     unsigned                   so_keepalive:2;
+     unsigned                   proxy_protocol:1;
+ 
+diff --git src/http/ngx_http_request.c src/http/ngx_http_request.c
+index eb53996..a9f5611 100644
+--- src/http/ngx_http_request.c
++++ src/http/ngx_http_request.c
+@@ -230,7 +230,11 @@ ngx_http_init_connection(ngx_connection_t *c)
+ 
+     port = c->listening->servers;
+ 
+-    if (port->naddrs > 1) {
++    if (port->naddrs > 1
++#if (NGX_HAVE_TRANSPARENT_PROXY)
++        || c->listening->transparent
++#endif
++    ) {
+ 
+         /*
+          * there are several addresses on this port and one of them
+diff --git src/stream/ngx_stream.c src/stream/ngx_stream.c
+index 7835675..6edf377 100644
+--- src/stream/ngx_stream.c
++++ src/stream/ngx_stream.c
+@@ -513,6 +513,9 @@ ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports)
+ #if (NGX_HAVE_REUSEPORT)
+             ls->reuseport = addr[i].opt.reuseport;
+ #endif
++#if (NGX_HAVE_TRANSPARENT_PROXY)
++            ls->transparent = addr[i].opt.transparent;
++#endif
+ 
+             stport = ngx_palloc(cf->pool, sizeof(ngx_stream_port_t));
+             if (stport == NULL) {
+diff --git src/stream/ngx_stream.h src/stream/ngx_stream.h
+index 9e35832..f74fa1b 100644
+--- src/stream/ngx_stream.h
++++ src/stream/ngx_stream.h
+@@ -55,6 +55,9 @@ typedef struct {
+     unsigned                       ipv6only:1;
+ #endif
+     unsigned                       reuseport:1;
++#if (NGX_HAVE_TRANSPARENT_PROXY)
++    unsigned                       transparent:1;
++#endif
+     unsigned                       so_keepalive:2;
+     unsigned                       proxy_protocol:1;
+ #if (NGX_HAVE_KEEPALIVE_TUNABLE)
+diff --git src/stream/ngx_stream_core_module.c src/stream/ngx_stream_core_module.c
+index 9b6afe9..95a7fe1 100644
+--- src/stream/ngx_stream_core_module.c
++++ src/stream/ngx_stream_core_module.c
+@@ -719,6 +719,18 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+             continue;
+         }
+ 
++        if (ngx_strcmp(value[i].data, "transparent") == 0) {
++#if (NGX_HAVE_TRANSPARENT_PROXY)
++            ls->transparent = 1;
++            continue;
++#else
++            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                               "transparent is not supported "
++                               "on this platform");
++            return NGX_CONF_ERROR;
++#endif
++        }
++
+         if (ngx_strcmp(value[i].data, "ssl") == 0) {
+ #if (NGX_STREAM_SSL)
+             ngx_stream_ssl_conf_t  *sslcf;
+diff --git src/stream/ngx_stream_handler.c src/stream/ngx_stream_handler.c
+index 669b6a1..41d20d7 100644
+--- src/stream/ngx_stream_handler.c
++++ src/stream/ngx_stream_handler.c
+@@ -42,7 +42,11 @@ ngx_stream_init_connection(ngx_connection_t *c)
+ 
+     port = c->listening->servers;
+ 
+-    if (port->naddrs > 1) {
++    if (port->naddrs > 1
++#if (NGX_HAVE_TRANSPARENT_PROXY)
++        || c->listening->transparent
++#endif
++    ) {
+ 
+         /*
+          * There are several addresses on this port and one of them
