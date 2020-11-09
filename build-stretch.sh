@@ -15,7 +15,7 @@ wget --no-check-certificate -qO- https://nginx.org/download/nginx-1.18.0.tar.gz 
 # https://www.nginx.com/blog/supporting-http2-google-chrome-users/
 # https://launchpad.net/~fxr/+archive/ubuntu/nginx-alpn/+packages
 mkdir -p openssl
-wget --no-check-certificate -qO- https://www.openssl.org/source/openssl-1.1.1g.tar.gz | tar -xvz --strip=1 -C openssl
+wget --no-check-certificate -qO- https://www.openssl.org/source/openssl-1.1.1h.tar.gz | tar -xvz --strip=1 -C openssl
 
 mkdir -p modules/dav-ext
 wget --no-check-certificate -qO- https://github.com/arut/nginx-dav-ext-module/archive/f5e30888a256136d9c550bf1ada77d6ea78a48af.tar.gz | tar -xvz --strip=1 -C modules/dav-ext
