@@ -52,7 +52,7 @@ config.env.%:
 
 config.status.nginx: config.env.nginx
 	cd $(BUILDDIR_nginx) && \
-	CFLAGS="" ./configure \
+	CFLAGS="-fno-strict-aliasing" ./configure \
 		--prefix=/etc/nginx \
 		--sbin-path=/usr/sbin/nginx \
 		--modules-path=/usr/lib/nginx/modules \
