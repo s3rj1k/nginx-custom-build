@@ -95,6 +95,7 @@ config.status.nginx: config.env.nginx
 		--with-stream_realip_module \
 		--with-stream_ssl_preread_module \
 		--with-openssl=$(BASEDIR)/openssl \
+		--with-openssl-opt=no-afalgeng \
 		--with-http_geoip_module \
 		--with-http_image_filter_module=dynamic \
 		--with-http_xslt_module=dynamic \
