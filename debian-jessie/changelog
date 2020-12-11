@@ -1,3 +1,9 @@
+nginx (1.18.0-1c~jessie) jessie; urgency=low
+
+  * bump openssl version
+
+ -- kaut <maksimkaut92@gmail.com>  Fri, 11 Dec 2020 15:30:00 +0300
+
 nginx (1.18.0-1b~jessie) jessie; urgency=low
 
   * bump openssl version
